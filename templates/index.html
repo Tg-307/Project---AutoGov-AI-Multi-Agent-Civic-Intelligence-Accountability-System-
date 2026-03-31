@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoGov AI — Civic Issue Detection System</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0f1e;
+    --surface: #111827;
+    --surface2: #1a2234;
+    --border: #1e2d4a;
+    --accent: #3b82f6;
+    --accent2: #06b6d4;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --critical: #dc2626;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Space Grotesk', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── BACKGROUND GRID ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(59,130,246,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59,130,246,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10,15,30,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 64px;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em;
+  }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .logo span { color: var(--accent); }
+  .header-badge {
+    font-size: 0.7rem; font-family: var(--mono);
+    padding: 3px 8px; border-radius: 4px;
+    background: rgba(59,130,246,0.15);
+    color: var(--accent2); border: 1px solid rgba(59,130,246,0.3);
+    letter-spacing: 0.08em;
+  }
+  nav { display: flex; gap: 4px; }
+  .nav-btn {
+    padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer;
+    font-family: var(--sans); font-size: 0.85rem; font-weight: 500;
+    background: transparent; color: var(--muted);
+    transition: all 0.2s;
+  }
+  .nav-btn:hover, .nav-btn.active {
+    background: rgba(59,130,246,0.15); color: var(--text);
+  }
+  .nav-btn.active { color: var(--accent); }
+
+  /* ── LAYOUT ── */
+  main { position: relative; z-index: 1; }
+  .page { display: none; padding: 2rem; max-width: 1200px; margin: 0 auto; }
+  .page.active { display: block; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+  }
+  .card-title {
+    font-size: 0.75rem; font-family: var(--mono);
+    letter-spacing: 0.1em; color: var(--accent2);
+    text-transform: uppercase; margin-bottom: 1.25rem;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card-title::after {
+    content: ''; flex: 1; height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+  }
+
+  /* ── UPLOAD ZONE ── */
+  .upload-zone {
+    border: 2px dashed var(--border); border-radius: 12px;
+    padding: 3rem 2rem; text-align: center; cursor: pointer;
+    transition: all 0.3s; background: var(--surface2);
+    position: relative; overflow: hidden;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent); background: rgba(59,130,246,0.06);
+  }
+  .upload-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%;
+  }
+  .upload-icon { font-size: 3rem; margin-bottom: 1rem; display: block; }
+  .upload-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.4rem; }
+  .upload-sub { font-size: 0.85rem; color: var(--muted); }
+  .upload-preview { display: none; margin-top: 1.5rem; }
+  .upload-preview img {
+    max-height: 200px; border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .preview-name {
+    font-family: var(--mono); font-size: 0.8rem;
+    color: var(--accent2); margin-top: 0.5rem;
+  }
+
+  /* ── FORM ── */
+  .form-row { margin-bottom: 1.25rem; }
+  label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.4rem; font-weight: 500; }
+  input[type=text], select, textarea {
+    width: 100%; padding: 10px 14px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface2);
+    color: var(--text); font-family: var(--sans); font-size: 0.9rem;
+    outline: none; transition: border-color 0.2s;
+  }
+  input[type=text]:focus, select:focus { border-color: var(--accent); }
+
+  /* ── BUTTONS ── */
+  .btn {
+    padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer;
+    font-family: var(--sans); font-weight: 600; font-size: 0.9rem;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: all 0.2s; letter-spacing: -0.01em;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #2563eb);
+    color: #fff; box-shadow: 0 4px 15px rgba(59,130,246,0.3);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(59,130,246,0.4); }
+  .btn-success { background: var(--success); color: #fff; }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-warning { background: var(--warning); color: #000; }
+  .btn-outline {
+    background: transparent; border: 1px solid var(--border); color: var(--text);
+  }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm { padding: 6px 12px; font-size: 0.8rem; border-radius: 6px; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+
+  /* ── BADGES ── */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 4px; font-size: 0.72rem;
+    font-family: var(--mono); font-weight: 500; letter-spacing: 0.05em;
+  }
+  .badge-pending { background: rgba(245,158,11,0.15); color: var(--warning); border: 1px solid rgba(245,158,11,0.3); }
+  .badge-sent { background: rgba(59,130,246,0.15); color: var(--accent); border: 1px solid rgba(59,130,246,0.3); }
+  .badge-resolved { background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3); }
+  .badge-escalated { background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+  .badge-in_progress { background: rgba(6,182,212,0.15); color: var(--accent2); border: 1px solid rgba(6,182,212,0.3); }
+  .badge-low { background: rgba(16,185,129,0.1); color: #34d399; }
+  .badge-medium { background: rgba(245,158,11,0.1); color: var(--warning); }
+  .badge-high { background: rgba(239,68,68,0.1); color: var(--danger); }
+  .badge-critical { background: rgba(220,38,38,0.2); color: #fca5a5; border: 1px solid rgba(220,38,38,0.4); }
+
+  /* ── RESULT PANEL ── */
+  .result-panel {
+    display: none; margin-top: 1.5rem;
+    border: 1px solid var(--border); border-radius: 12px;
+    overflow: hidden;
+  }
+  .result-header {
+    padding: 1rem 1.5rem;
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(6,182,212,0.1));
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .result-title { font-weight: 700; font-size: 1rem; }
+  .result-body { padding: 1.5rem; }
+  .result-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 1rem; margin-bottom: 1.25rem;
+  }
+  .result-field label { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.05em; text-transform: uppercase; display: block; margin-bottom: 3px; }
+  .result-field .val { font-weight: 600; font-size: 0.95rem; }
+  .complaint-box {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1rem;
+    font-family: var(--mono); font-size: 0.78rem; line-height: 1.7;
+    color: #94a3b8; white-space: pre-wrap; max-height: 180px; overflow-y: auto;
+  }
+  .confidence-bar {
+    height: 6px; background: var(--border); border-radius: 3px; margin-top: 6px;
+  }
+  .confidence-fill {
+    height: 100%; border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transition: width 0.8s ease;
+  }
+
+  /* ── AGENT TRACE ── */
+  .agent-trace {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-top: 1rem;
+  }
+  .agent-chip {
+    font-family: var(--mono); font-size: 0.7rem; padding: 3px 10px;
+    border-radius: 20px; border: 1px solid rgba(59,130,246,0.3);
+    background: rgba(59,130,246,0.08); color: var(--accent2);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .agent-chip::before { content: '⬡'; font-size: 0.65rem; }
+
+  /* ── ISSUES TABLE ── */
+  .table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: var(--surface2); }
+  th {
+    padding: 10px 14px; text-align: left;
+    font-size: 0.72rem; font-weight: 600; color: var(--muted);
+    letter-spacing: 0.06em; text-transform: uppercase;
+    border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  td { padding: 12px 14px; border-bottom: 1px solid rgba(30,45,74,0.5); font-size: 0.85rem; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(59,130,246,0.04); }
+  .esc-badge {
+    font-family: var(--mono); font-size: 0.72rem; font-weight: 700;
+    width: 20px; height: 20px; border-radius: 4px; display: inline-flex;
+    align-items: center; justify-content: center;
+    background: rgba(239,68,68,0.15); color: var(--danger);
+  }
+  .esc-badge.zero { background: rgba(16,185,129,0.1); color: var(--success); }
+  .overdue-dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--danger); margin-right: 4px;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ── STATS GRID ── */
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem; margin-bottom: 2rem;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1.25rem; position: relative; overflow: hidden;
+  }
+  .stat-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+  .stat-card.blue::before { background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+  .stat-card.green::before { background: var(--success); }
+  .stat-card.yellow::before { background: var(--warning); }
+  .stat-card.red::before { background: var(--danger); }
+  .stat-value { font-size: 2rem; font-weight: 700; letter-spacing: -0.04em; }
+  .stat-label { font-size: 0.78rem; color: var(--muted); margin-top: 4px; font-weight: 500; }
+
+  /* ── RATING CARDS ── */
+  .ratings-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+  }
+  .rating-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1.5rem;
+  }
+  .rating-card-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem; }
+  .dept-name { font-weight: 700; font-size: 0.95rem; }
+  .dept-code { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+  .grade-circle {
+    width: 42px; height: 42px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 1.1rem;
+    border: 2px solid;
+  }
+  .grade-A { color: var(--success); border-color: var(--success); background: rgba(16,185,129,0.1); }
+  .grade-B { color: var(--accent2); border-color: var(--accent2); background: rgba(6,182,212,0.1); }
+  .grade-C { color: var(--warning); border-color: var(--warning); background: rgba(245,158,11,0.1); }
+  .grade-D { color: var(--danger); border-color: var(--danger); background: rgba(239,68,68,0.1); }
+  .grade-F { color: var(--critical); border-color: var(--critical); background: rgba(220,38,38,0.15); }
+  .grade-NA { color: var(--muted); border-color: var(--border); }
+  .rating-score {
+    font-size: 1.5rem; font-weight: 700; letter-spacing: -0.03em;
+    margin-bottom: 0.5rem;
+  }
+  .rating-bar { height: 6px; background: var(--border); border-radius: 3px; margin: 0.75rem 0; }
+  .rating-fill { height: 100%; border-radius: 3px; transition: width 1s ease; }
+  .rating-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-top: 0.75rem; }
+  .rs { text-align: center; }
+  .rs .rv { font-size: 1rem; font-weight: 700; }
+  .rs .rl { font-size: 0.68rem; color: var(--muted); }
+
+  /* ── LOADER ── */
+  .loader {
+    display: none; align-items: center; gap: 10px;
+    padding: 0.75rem 1rem; background: rgba(59,130,246,0.08);
+    border: 1px solid rgba(59,130,246,0.2); border-radius: 8px;
+    font-family: var(--mono); font-size: 0.8rem; color: var(--accent2);
+    margin-top: 1rem;
+  }
+  .spinner {
+    width: 16px; height: 16px; border: 2px solid rgba(59,130,246,0.3);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.8s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── PIPELINE STEPS ── */
+  .pipeline-steps {
+    display: none; margin-top: 1rem;
+  }
+  .pipeline-step {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 0; font-size: 0.82rem;
+    opacity: 0; transform: translateX(-10px);
+    transition: all 0.3s;
+  }
+  .pipeline-step.visible { opacity: 1; transform: translateX(0); }
+  .step-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--muted); flex-shrink: 0;
+  }
+  .pipeline-step.done .step-dot { background: var(--success); }
+  .pipeline-step.active .step-dot {
+    background: var(--accent);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
+    animation: pulse 1s infinite;
+  }
+
+  /* ── ALERTS ── */
+  .alert {
+    padding: 12px 16px; border-radius: 8px; margin-top: 1rem;
+    font-size: 0.87rem; display: flex; align-items: flex-start; gap: 10px;
+  }
+  .alert-success { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); color: #34d399; }
+  .alert-error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
+  .alert-info { background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3); color: var(--accent2); }
+  .alert-warn { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); color: var(--warning); }
+
+  /* ── ESCALATION CONTROLS ── */
+  .escalation-panel {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.25rem; margin-top: 1rem;
+  }
+  .esc-title {
+    font-size: 0.78rem; font-weight: 600; color: var(--warning);
+    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.75rem;
+  }
+  .sim-row { display: flex; gap: 10px; align-items: flex-end; }
+  .sim-row input { max-width: 120px; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    .result-grid { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    header { padding: 0 1rem; }
+    .page { padding: 1rem; }
+    nav .nav-btn span { display: none; }
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center; padding: 4rem 2rem; color: var(--muted);
+  }
+  .empty-state .es-icon { font-size: 3rem; margin-bottom: 1rem; display: block; }
+  .empty-state h3 { font-size: 1rem; margin-bottom: 0.4rem; color: var(--text); }
+
+  /* ── FILTER BAR ── */
+  .filter-bar {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+  }
+  .filter-bar select { max-width: 160px; }
+  .filter-count {
+    font-family: var(--mono); font-size: 0.78rem; color: var(--muted);
+    margin-left: auto;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+    align-items: center; justify-content: center; padding: 1rem;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 2rem; max-width: 600px; width: 100%;
+    max-height: 85vh; overflow-y: auto;
+  }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+  .modal-title { font-weight: 700; font-size: 1.05rem; }
+  .modal-close { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.3rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    Auto<span>Gov</span> AI
+    <span class="header-badge">MULTI-AGENT</span>
+  </div>
+  <nav>
+    <button class="nav-btn active" onclick="showPage('upload', this)">⬆ <span>Upload</span></button>
+    <button class="nav-btn" onclick="showPage('issues', this)">📋 <span>Issues</span></button>
+    <button class="nav-btn" onclick="showPage('ratings', this)">⭐ <span>Ratings</span></button>
+    <button class="nav-btn" onclick="showPage('escalate', this)">🚨 <span>Escalate</span></button>
+  </nav>
+</header>
+
+<main>
+
+  <!-- ══════════════════ UPLOAD PAGE ══════════════════ -->
+  <div class="page active" id="page-upload">
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1rem;">
+
+      <!-- Upload Form -->
+      <div>
+        <div class="card">
+          <div class="card-title">📸 Report Civic Issue</div>
+
+          <div class="upload-zone" id="dropZone">
+            <input type="file" id="imageInput" accept="image/*">
+            <span class="upload-icon">🖼️</span>
+            <div class="upload-title">Drop image or click to upload</div>
+            <div class="upload-sub">Supports JPG, PNG, WEBP</div>
+            <div class="upload-preview" id="uploadPreview">
+              <img id="previewImg" src="" alt="Preview">
+              <div class="preview-name" id="previewName"></div>
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 1.25rem;">
+            <label>📍 Location (optional — auto-assigned if blank)</label>
+            <input type="text" id="locationInput" placeholder="e.g. MG Road, Near City Mall">
+          </div>
+
+          <button class="btn btn-primary" id="analyzeBtn" style="width:100%; justify-content:center;" onclick="analyzeImage()">
+            ⚡ Analyze & Detect Issue
+          </button>
+
+          <div class="loader" id="loader">
+            <div class="spinner"></div>
+            <span id="loaderText">Initializing pipeline...</span>
+          </div>
+
+          <!-- Pipeline steps visualization -->
+          <div class="pipeline-steps" id="pipelineSteps">
+            <div class="pipeline-step" id="step-1"><div class="step-dot"></div>👁️ VisionAgent — Detecting issue...</div>
+            <div class="pipeline-step" id="step-2"><div class="step-dot"></div>✅ ValidationAgent — Checking confidence...</div>
+            <div class="pipeline-step" id="step-3"><div class="step-dot"></div>🗺️ RoutingAgent — Assigning department...</div>
+            <div class="pipeline-step" id="step-4"><div class="step-dot"></div>📝 ComplaintAgent — Generating complaint...</div>
+            <div class="pipeline-step" id="step-5"><div class="step-dot"></div>💾 ToolAgent — Saving to database...</div>
+          </div>
+
+          <div id="alertBox"></div>
+        </div>
+      </div>
+
+      <!-- Result Panel -->
+      <div id="resultSection">
+        <div class="card" id="resultCard" style="display:none;">
+          <div class="card-title">🎯 Detection Result</div>
+
+          <div class="result-grid">
+            <div class="result-field">
+              <label>Issue Type</label>
+              <div class="val" id="r-type">—</div>
+            </div>
+            <div class="result-field">
+              <label>Severity</label>
+              <div class="val" id="r-severity">—</div>
+            </div>
+            <div class="result-field">
+              <label>Department</label>
+              <div class="val" id="r-dept">—</div>
+            </div>
+            <div class="result-field">
+              <label>Status</label>
+              <div class="val" id="r-status">—</div>
+            </div>
+            <div class="result-field" style="grid-column: 1/-1;">
+              <label>Location</label>
+              <div class="val" id="r-location">—</div>
+            </div>
+            <div class="result-field" style="grid-column: 1/-1;">
+              <label>Confidence</label>
+              <div class="confidence-bar"><div class="confidence-fill" id="r-conf-bar" style="width:0%"></div></div>
+              <div style="font-size:0.78rem; color:var(--muted); margin-top:4px;" id="r-conf-text">0%</div>
+            </div>
+          </div>
+
+          <div class="card-title" style="margin-top: 1rem;">📄 Generated Complaint</div>
+          <div class="complaint-box" id="r-complaint">—</div>
+
+          <div class="card-title" style="margin-top: 1rem;">🤖 Agent Pipeline Trace</div>
+          <div class="agent-trace" id="r-agents"></div>
+
+          <div style="display:flex; gap:10px; margin-top: 1.25rem; flex-wrap: wrap;">
+            <button class="btn btn-success" id="sendBtn" onclick="sendComplaint()">
+              📤 Send Complaint
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="showPage('issues', document.querySelectorAll('.nav-btn')[1])">
+              📋 View All Issues
+            </button>
+          </div>
+
+          <div id="sendAlert"></div>
+
+          <div id="duplicateAlert"></div>
+        </div>
+
+        <!-- Empty placeholder -->
+        <div class="card" id="emptyResult">
+          <div class="empty-state">
+            <span class="es-icon">🏙️</span>
+            <h3>No Image Analyzed Yet</h3>
+            <p style="font-size:0.85rem; margin-top:0.5rem;">Upload a civic image to start the<br>multi-agent detection pipeline.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ ISSUES PAGE ══════════════════ -->
+  <div class="page" id="page-issues">
+    <div style="margin-top:1rem;">
+      <!-- Stats Row -->
+      <div class="stats-grid" id="dashStats"></div>
+
+      <div class="card">
+        <div class="card-title">📋 All Reported Issues</div>
+
+        <div class="filter-bar">
+          <select id="filterStatus" onchange="loadIssues()">
+            <option value="">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="sent">Sent</option>
+            <option value="in_progress">In Progress</option>
+            <option value="resolved">Resolved</option>
+            <option value="escalated">Escalated</option>
+          </select>
+          <select id="filterType" onchange="loadIssues()">
+            <option value="">All Types</option>
+            <option value="pothole">Pothole</option>
+            <option value="garbage">Garbage</option>
+            <option value="broken_streetlight">Broken Streetlight</option>
+            <option value="open_drain">Open Drain</option>
+            <option value="encroachment">Encroachment</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="loadIssues()">🔄 Refresh</button>
+          <span class="filter-count" id="issueCount">—</span>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#ID</th>
+                <th>Type</th>
+                <th>Location</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th>Department</th>
+                <th>Esc.</th>
+                <th>Reported</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="issuesBody">
+              <tr><td colspan="9" style="text-align:center; padding:2rem; color:var(--muted);">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ RATINGS PAGE ══════════════════ -->
+  <div class="page" id="page-ratings">
+    <div style="margin-top:1rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+        <h2 style="font-weight:700; font-size:1.1rem;">⭐ Department Performance Ratings</h2>
+        <button class="btn btn-outline btn-sm" onclick="loadRatings()">🔄 Refresh Ratings</button>
+      </div>
+      <div class="ratings-grid" id="ratingsGrid">
+        <div style="color:var(--muted); font-size:0.85rem;">Loading ratings...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ ESCALATION PAGE ══════════════════ -->
+  <div class="page" id="page-escalate">
+    <div style="margin-top:1rem; max-width: 700px;">
+      <div class="card">
+        <div class="card-title">🚨 Escalation Control Panel</div>
+
+        <div class="alert alert-warn">
+          ⚠️ The escalation engine checks all unresolved issues past their deadline and upgrades severity + complaint wording automatically.
+        </div>
+
+        <div class="escalation-panel" style="margin-top:1rem;">
+          <div class="esc-title">🕐 Real-Time Escalation Check</div>
+          <p style="font-size:0.85rem; color:var(--muted); margin-bottom:0.75rem;">
+            Checks issues that have actually exceeded their real deadline hours.
+          </p>
+          <button class="btn btn-danger" onclick="runEscalation()">
+            🚨 Run Escalation Check Now
+          </button>
+        </div>
+
+        <div class="escalation-panel">
+          <div class="esc-title">⏱️ Simulated Time Escalation</div>
+          <p style="font-size:0.85rem; color:var(--muted); margin-bottom:0.75rem;">
+            Simulate that X hours have passed. Any issue with deadline ≤ X hours will be escalated.
+          </p>
+          <div class="sim-row">
+            <div class="form-row" style="margin:0;">
+              <label>Simulate Hours Elapsed</label>
+              <input type="text" id="simHours" placeholder="e.g. 24" style="max-width:120px;">
+            </div>
+            <button class="btn btn-warning" onclick="runSimulatedEscalation()">
+              ⏩ Simulate Escalation
+            </button>
+          </div>
+        </div>
+
+        <div class="escalation-panel">
+          <div class="esc-title">🎯 Escalate Single Issue</div>
+          <div class="sim-row">
+            <div class="form-row" style="margin:0;">
+              <label>Issue ID</label>
+              <input type="text" id="singleEscId" placeholder="e.g. 1" style="max-width:120px;">
+            </div>
+            <button class="btn btn-outline" onclick="escalateSingle()">
+              ⬆ Escalate Issue
+            </button>
+          </div>
+        </div>
+
+        <div id="escResult" style="margin-top:1rem;"></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ── ISSUE DETAIL MODAL ── -->
+<div class="modal-overlay" id="issueModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">Issue Details</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+const API = '/api';
+let currentIssueId = null;
+
+// ── PAGE NAVIGATION ──────────────────────────────────────
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (name === 'issues') loadIssues();
+  if (name === 'ratings') loadRatings();
+}
+
+// ── IMAGE UPLOAD PREVIEW ─────────────────────────────────
+document.getElementById('imageInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    document.getElementById('previewImg').src = ev.target.result;
+    document.getElementById('previewName').textContent = file.name;
+    document.getElementById('uploadPreview').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+});
+
+// Drag & drop
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    document.getElementById('imageInput').files = e.dataTransfer.files;
+    document.getElementById('imageInput').dispatchEvent(new Event('change'));
+  }
+});
+
+// ── PIPELINE ANIMATION ───────────────────────────────────
+async function animatePipeline() {
+  const steps = document.querySelectorAll('.pipeline-step');
+  document.getElementById('pipelineSteps').style.display = 'block';
+  const labels = [
+    'VisionAgent detecting issue type...',
+    'ValidationAgent checking confidence...',
+    'RoutingAgent assigning department...',
+    'ComplaintAgent generating text...',
+    'ToolAgent saving to database...',
+  ];
+  for (let i = 0; i < steps.length; i++) {
+    steps[i].classList.add('visible', 'active');
+    document.getElementById('loaderText').textContent = labels[i];
+    await sleep(500);
+    if (i > 0) { steps[i-1].classList.remove('active'); steps[i-1].classList.add('done'); }
+  }
+}
+function resetPipeline() {
+  document.querySelectorAll('.pipeline-step').forEach(s => s.className = 'pipeline-step');
+  document.getElementById('pipelineSteps').style.display = 'none';
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ── ANALYZE IMAGE ────────────────────────────────────────
+async function analyzeImage() {
+  const fileInput = document.getElementById('imageInput');
+  const file = fileInput.files[0];
+  if (!file) {
+    showAlert('alertBox', 'error', '📸 Please select an image first.');
+    return;
+  }
+
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  document.getElementById('loader').style.display = 'flex';
+  document.getElementById('alertBox').innerHTML = '';
+  document.getElementById('resultCard').style.display = 'none';
+  document.getElementById('emptyResult').style.display = 'none';
+  resetPipeline();
+
+  animatePipeline();
+
+  const formData = new FormData();
+  formData.append('image', file);
+  const loc = document.getElementById('locationInput').value.trim();
+  if (loc) formData.append('location', loc);
+
+  try {
+    const { ok, data, status, raw } = await safeJSON(`${API}/upload/`, { method: 'POST', body: formData });
+
+    // Finish animation
+    document.querySelectorAll('.pipeline-step').forEach(s => { s.classList.add('visible', 'done'); s.classList.remove('active'); });
+    await sleep(300);
+
+    if (!data) {
+      showAlert('alertBox', 'error', `❌ Server error ${status}. Check Django console. ${raw||''}`);
+      document.getElementById('emptyResult').style.display = 'block';
+    } else if (ok && data.success) {
+      currentIssueId = data.issue_id;
+      renderResult(data);
+      document.getElementById('resultCard').style.display = 'block';
+    } else {
+      showAlert('alertBox', 'error', `❌ ${data.reason || data.error || 'Detection failed'}`);
+      document.getElementById('emptyResult').style.display = 'block';
+    }
+  } catch (err) {
+    showAlert('alertBox', 'error', `❌ Server error: ${err.message}`);
+    document.getElementById('emptyResult').style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    document.getElementById('loader').style.display = 'none';
+  }
+}
+
+function renderResult(data) {
+  const typeLabel = (data.issue_type || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  document.getElementById('r-type').innerHTML = `<span class="badge badge-sent">${typeLabel}</span>`;
+  document.getElementById('r-severity').innerHTML = `<span class="badge badge-${data.severity}">${(data.severity||'').toUpperCase()}</span>`;
+  document.getElementById('r-dept').textContent = data.department || '—';
+  document.getElementById('r-status').innerHTML = `<span class="badge badge-${data.status}">${data.status}</span>`;
+  document.getElementById('r-location').textContent = data.location || '—';
+
+  const conf = Math.round((data.confidence || 0) * 100);
+  document.getElementById('r-conf-bar').style.width = conf + '%';
+  document.getElementById('r-conf-text').textContent = `${conf}% confidence`;
+
+  document.getElementById('r-complaint').textContent = data.complaint_text || '—';
+
+  const trace = data.agents_trace || {};
+  const agents = document.getElementById('r-agents');
+  agents.innerHTML = Object.values(trace).filter(Boolean).map(a =>
+    `<span class="agent-chip">${a}</span>`
+  ).join('');
+
+  document.getElementById('sendBtn').textContent = `📤 Send to ${data.department_code || 'Dept'}`;
+
+  if (data.is_duplicate) {
+    document.getElementById('duplicateAlert').innerHTML = `
+      <div class="alert alert-warn" style="margin-top:0.75rem;">
+        ⚠️ Possible duplicate of Issue #${data.duplicate_issue_id}
+      </div>`;
+  }
+}
+
+// ── SEND COMPLAINT ───────────────────────────────────────
+async function sendComplaint() {
+  if (!currentIssueId) return;
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true; btn.textContent = '📤 Sending...';
+
+  try {
+    const { ok, data } = await safeJSON(`${API}/send/${currentIssueId}/`, { method: 'POST' });
+    if (data && (data.sent || data.success)) {
+      showAlert('sendAlert', 'success', `✅ Complaint sent to ${data.department} (${data.to})`);
+      document.getElementById('r-status').innerHTML = `<span class="badge badge-sent">sent</span>`;
+      btn.textContent = '✅ Sent';
+    } else {
+      showAlert('sendAlert', 'error', `❌ ${data.error || 'Send failed'}`);
+      btn.disabled = false; btn.textContent = '📤 Retry Send';
+    }
+  } catch (err) {
+    showAlert('sendAlert', 'error', `❌ ${err.message}`);
+    btn.disabled = false;
+  }
+}
+
+// ── SAFE JSON FETCH (never throws on HTML error pages) ───
+async function safeJSON(url, options) {
+  const res = await fetch(url, options);
+  const text = await res.text();
+  try {
+    return { ok: res.ok, status: res.status, data: JSON.parse(text) };
+  } catch {
+    console.error('Non-JSON response from', url, ':', text.slice(0, 300));
+    return { ok: false, status: res.status, data: null, raw: text.slice(0, 200) };
+  }
+}
+
+// ── LOAD ISSUES ──────────────────────────────────────────
+async function loadIssues() {
+  loadDashStats();
+  const statusFilter = document.getElementById('filterStatus')?.value || '';
+  const typeFilter = document.getElementById('filterType')?.value || '';
+
+  try {
+    const { ok, data, status, raw } = await safeJSON(`${API}/issues/`);
+    if (!ok || !data) {
+      document.getElementById('issuesBody').innerHTML =
+        `<tr><td colspan="9" style="color:var(--danger);text-align:center;padding:1.5rem;">
+          ⚠️ Server error (${status}). Is Django running at 127.0.0.1:8000?<br>
+          <small style="color:var(--muted);">${raw||''}</small>
+        </td></tr>`;
+      return;
+    }
+    let issues = data.issues || [];
+
+    if (statusFilter) issues = issues.filter(i => i.status === statusFilter);
+    if (typeFilter) issues = issues.filter(i => i.issue_type === typeFilter);
+
+    document.getElementById('issueCount').textContent = `${issues.length} issues`;
+    const tbody = document.getElementById('issuesBody');
+
+    if (!issues.length) {
+      tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><span class="es-icon">📭</span><h3>No issues found</h3></div></td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = issues.map(issue => {
+      const typeLabel = (issue.issue_type||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+      const date = new Date(issue.created_at).toLocaleDateString('en-IN', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+      const overdueDot = issue.is_overdue ? '<span class="overdue-dot"></span>' : '';
+      const escClass = issue.escalation_level > 0 ? '' : 'zero';
+      return `<tr>
+        <td><code style="color:var(--accent2);">#${issue.id}</code></td>
+        <td>${typeLabel}</td>
+        <td style="max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${issue.location}">${issue.location}</td>
+        <td><span class="badge badge-${issue.severity}">${(issue.severity||'').toUpperCase()}</span></td>
+        <td>${overdueDot}<span class="badge badge-${issue.status}">${issue.status}</span></td>
+        <td style="font-size:0.8rem;">${issue.department_name || '—'}</td>
+        <td><span class="esc-badge ${escClass}">${issue.escalation_level}</span></td>
+        <td style="font-size:0.78rem; color:var(--muted);">${date}</td>
+        <td>
+          <div style="display:flex; gap:5px; flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm" onclick="viewIssue(${issue.id})">👁</button>
+            ${issue.status !== 'resolved' ? `<button class="btn btn-success btn-sm" onclick="resolveIssue(${issue.id})">✓</button>` : ''}
+            ${issue.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="sendIssue(${issue.id})">📤</button>` : ''}
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch (err) {
+    document.getElementById('issuesBody').innerHTML = `<tr><td colspan="9" style="color:var(--danger); text-align:center;">Error: ${err.message}</td></tr>`;
+  }
+}
+
+async function loadDashStats() {
+  try {
+    const { ok, data } = await safeJSON(`${API}/dashboard/`);
+    if (!ok || !data) return;
+    document.getElementById('dashStats').innerHTML = `
+      <div class="stat-card blue"><div class="stat-value">${data.total_issues}</div><div class="stat-label">Total Issues</div></div>
+      <div class="stat-card green"><div class="stat-value">${data.by_status?.resolved||0}</div><div class="stat-label">Resolved</div></div>
+      <div class="stat-card yellow"><div class="stat-value">${data.overdue_issues||0}</div><div class="stat-label">Overdue</div></div>
+      <div class="stat-card red"><div class="stat-value">${data.escalated_issues||0}</div><div class="stat-label">Escalated</div></div>
+    `;
+  } catch {}
+}
+
+async function viewIssue(id) {
+  const { ok, data: issue } = await safeJSON(`${API}/issues/${id}/`);
+  if (!ok || !issue) return;
+  const typeLabel = (issue.issue_type||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+  document.getElementById('modalTitle').textContent = `Issue #${issue.id} — ${typeLabel}`;
+  const logs = (issue.escalation_logs||[]).map(l =>
+    `<div style="border-left:2px solid var(--danger); padding:0.5rem 1rem; margin:0.5rem 0; font-size:0.78rem;">
+      <div style="color:var(--danger); font-weight:600;">Level ${l.level} — ${new Date(l.timestamp).toLocaleString()}</div>
+      <div style="color:var(--muted); margin-top:4px;">${l.reason}</div>
+    </div>`
+  ).join('') || '<div style="color:var(--muted); font-size:0.85rem;">No escalations</div>';
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="result-grid">
+      <div class="result-field"><label>Type</label><div class="val">${typeLabel}</div></div>
+      <div class="result-field"><label>Severity</label><div class="val"><span class="badge badge-${issue.severity}">${(issue.severity||'').toUpperCase()}</span></div></div>
+      <div class="result-field"><label>Status</label><div class="val"><span class="badge badge-${issue.status}">${issue.status}</span></div></div>
+      <div class="result-field"><label>Department</label><div class="val">${issue.department_name}</div></div>
+      <div class="result-field" style="grid-column:1/-1;"><label>Location</label><div class="val">${issue.location}</div></div>
+      <div class="result-field"><label>Confidence</label><div class="val">${Math.round((issue.confidence||0)*100)}%</div></div>
+      <div class="result-field"><label>Escalation Level</label><div class="val">${issue.escalation_level}</div></div>
+      <div class="result-field"><label>Deadline</label><div class="val">${issue.deadline_hours}h</div></div>
+      <div class="result-field"><label>Overdue?</label><div class="val">${issue.is_overdue ? '⚠️ YES' : '✅ No'}</div></div>
+    </div>
+    <div class="card-title" style="margin-top:1rem;">📄 Complaint Text</div>
+    <div class="complaint-box">${issue.complaint_text||'—'}</div>
+    <div class="card-title" style="margin-top:1rem;">📈 Escalation History</div>
+    ${logs}
+    <div style="display:flex; gap:8px; margin-top:1.25rem; flex-wrap:wrap;">
+      ${issue.status !== 'resolved' ? `<button class="btn btn-success btn-sm" onclick="resolveIssue(${issue.id}); closeModal();">✓ Resolve</button>` : ''}
+      ${issue.status !== 'resolved' ? `<button class="btn btn-danger btn-sm" onclick="escalateSingleDirect(${issue.id})">⬆ Escalate</button>` : ''}
+      ${issue.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="sendIssue(${issue.id}); closeModal();">📤 Send</button>` : ''}
+    </div>
+  `;
+  document.getElementById('issueModal').classList.add('open');
+}
+
+function closeModal() { document.getElementById('issueModal').classList.remove('open'); }
+
+async function resolveIssue(id) {
+  await safeJSON(`${API}/resolve/${id}/`, { method: 'POST' });
+  loadIssues();
+}
+
+async function sendIssue(id) {
+  await safeJSON(`${API}/send/${id}/`, { method: 'POST' });
+  loadIssues();
+}
+
+async function escalateSingleDirect(id) {
+  await safeJSON(`${API}/escalate/?issue_id=${id}`);
+  closeModal();
+  loadIssues();
+}
+
+// ── ESCALATION PAGE FUNCTIONS ─────────────────────────────
+async function runEscalation() {
+  const { data } = await safeJSON(`${API}/escalate/`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' });
+  if (!data) { document.getElementById('escResult').innerHTML = `<div class="alert alert-error">Server error. Check Django console.</div>`; return; }
+  document.getElementById('escResult').innerHTML = `
+    <div class="alert alert-${data.escalated_count > 0 ? 'warn' : 'success'}">
+      ${data.escalated_count > 0
+        ? `🚨 Escalated ${data.escalated_count} issue(s): IDs [${data.escalated_issue_ids.join(', ')}]`
+        : '✅ No issues due for escalation right now.'}
+    </div>`;
+}
+
+async function runSimulatedEscalation() {
+  const hours = parseFloat(document.getElementById('simHours').value);
+  if (!hours || isNaN(hours)) { showAlert('escResult', 'error', 'Enter valid hours'); return; }
+  const { data } = await safeJSON(`${API}/escalate/`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ simulate_hours: hours }),
+  });
+  if (!data) { document.getElementById('escResult').innerHTML = `<div class="alert alert-error">Server error.</div>`; return; }
+  document.getElementById('escResult').innerHTML = `
+    <div class="alert alert-${data.escalated_count > 0 ? 'warn' : 'info'}">
+      ⏩ Simulated ${hours}h elapsed → ${data.escalated_count} issue(s) escalated
+      ${data.escalated_issue_ids?.length ? `: IDs [${data.escalated_issue_ids.join(', ')}]` : ''}
+    </div>`;
+}
+
+async function escalateSingle() {
+  const id = document.getElementById('singleEscId').value.trim();
+  if (!id) return;
+  const { data } = await safeJSON(`${API}/escalate/?issue_id=${id}`);
+  if (!data) { document.getElementById('escResult').innerHTML = `<div class="alert alert-error">Server error.</div>`; return; }
+  document.getElementById('escResult').innerHTML = `
+    <div class="alert alert-${data.escalated ? 'warn' : 'info'}">
+      ${data.escalated ? `⬆ Issue #${id} escalated to Level ${data.issue?.escalation_level}` : `ℹ️ Issue #${id} not escalated (already at max or not found)`}
+    </div>`;
+}
+
+// ── LOAD RATINGS ─────────────────────────────────────────
+async function loadRatings() {
+  const grid = document.getElementById('ratingsGrid');
+  grid.innerHTML = '<div style="color:var(--muted);">Loading...</div>';
+  try {
+    const { ok, data, status } = await safeJSON(`${API}/ratings/`);
+    if (!ok || !data) {
+      grid.innerHTML = `<div class="alert alert-error">Server error ${status}. Is Django running?</div>`;
+      return;
+    }
+    const depts = data.departments || [];
+    if (!depts.length) {
+      grid.innerHTML = '<div class="empty-state"><span class="es-icon">📊</span><h3>No departments yet</h3><p>Upload and send issues to populate ratings.</p></div>';
+      return;
+    }
+    const ratingColor = (r) => r >= 75 ? 'var(--success)' : r >= 50 ? 'var(--warning)' : 'var(--danger)';
+    grid.innerHTML = depts.map(d => `
+      <div class="rating-card">
+        <div class="rating-card-header">
+          <div>
+            <div class="dept-name">${d.department_name}</div>
+            <div class="dept-code">${d.department_code}</div>
+          </div>
+          <div class="grade-circle grade-${d.grade||'NA'}">${d.grade||'N/A'}</div>
+        </div>
+        <div class="rating-score">${d.rating}%</div>
+        <div class="rating-bar">
+          <div class="rating-fill" style="width:${d.rating}%; background:${ratingColor(d.rating)};"></div>
+        </div>
+        <div class="rating-stats">
+          <div class="rs"><div class="rv">${d.total_issues}</div><div class="rl">Total</div></div>
+          <div class="rs"><div class="rv" style="color:var(--success);">${d.resolved_issues}</div><div class="rl">Resolved</div></div>
+          <div class="rs"><div class="rv" style="color:var(--danger);">${d.escalated_issues}</div><div class="rl">Escalated</div></div>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    grid.innerHTML = `<div class="alert alert-error">Error: ${err.message}</div>`;
+  }
+}
+
+// ── ALERT HELPER ─────────────────────────────────────────
+function showAlert(containerId, type, message) {
+  document.getElementById(containerId).innerHTML =
+    `<div class="alert alert-${type}" style="margin-top:0.75rem;">${message}</div>`;
+}
+
+// ── INIT ─────────────────────────────────────────────────
+window.addEventListener('click', e => {
+  if (e.target === document.getElementById('issueModal')) closeModal();
+});
+</script>
+</body>
+</html>
